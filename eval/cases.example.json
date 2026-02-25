@@ -1,0 +1,11 @@
+[
+  {
+    "question": "Where is routing handled?",
+    "expectedSourceFiles": ["app/router.ts"]
+  },
+  {
+    "question": "How is authentication implemented?",
+    "expectedAnswerRegex": "auth|login|token",
+    "expectedSourceFiles": ["lib/auth.ts", "src/auth/index.ts"]
+  }
+]
