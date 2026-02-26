@@ -86,7 +86,6 @@ export const HYBRID_BM25_WEIGHT = 0.35;
 export const HYBRID_RRF_K = 60;
 export const BM25_K1 = 1.2;
 export const BM25_B = 0.75;
-export const MAX_LEXICAL_DOCUMENTS = 3500;
 
 export const EMBEDDING_COST_PER_1K_TOKENS = 0.00002;
 export const COMPLETION_INPUT_COST_PER_1K_TOKENS = 0.00015;

@@ -1,6 +1,5 @@
 import {
   CONTEXT_MAX_TOKENS,
-  MAX_LEXICAL_DOCUMENTS,
   RETRIEVAL_MAX_RESULTS,
   RETRIEVAL_MIN_RESULTS,
   RETRIEVAL_QUERY_CANDIDATES,
@@ -73,19 +72,12 @@ export async function retrieveContext(
   const collection = await getRepoChunksCollection();
   const [questionEmbedding] = await embedTexts([question]);
 
-  const [vectorResult, lexicalCorpus] = await Promise.all([
-    collection.query({
-      queryEmbeddings: [questionEmbedding],
-      nResults: RETRIEVAL_QUERY_CANDIDATES * 2,
-      where: { repoId },
-      include: ["metadatas", "documents", "distances"],
-    }),
-    collection.get({
-      where: { repoId },
-      include: ["metadatas", "documents"],
-      limit: MAX_LEXICAL_DOCUMENTS,
-    }),
-  ]);
+  const vectorResult = await collection.query({
+    queryEmbeddings: [questionEmbedding],
+    nResults: RETRIEVAL_QUERY_CANDIDATES * 3,
+    where: { repoId },
+    include: ["metadatas", "documents", "distances"],
+  });
 
   const vectorIds = vectorResult.ids[0] ?? [];
   const vectorMetadatas = vectorResult.metadatas?.[0] ?? [];
@@ -120,51 +112,23 @@ export async function retrieveContext(
     vectorRankedIds.push(id);
   });
 
-  const lexicalIds = lexicalCorpus.ids ?? [];
-  const lexicalMetadatas = lexicalCorpus.metadatas ?? [];
-  const lexicalDocuments = lexicalCorpus.documents ?? [];
-  const lexicalIndexById = new Map<string, number>();
-  lexicalIds.forEach((id, index) => lexicalIndexById.set(id, index));
-
   const lexicalScores = computeBm25Scores(
     question,
-    lexicalIds.map((id, index) => ({
+    vectorIds.map((id, index) => ({
       id,
-      content: lexicalDocuments[index] ?? "",
+      content: vectorDocuments[index] ?? "",
     })),
   );
 
   const lexicalRankedIds: string[] = [];
   lexicalScores.forEach((item, index) => {
-    const docIndex = lexicalIndexById.get(item.id);
-    if (docIndex === undefined) {
-      return;
-    }
-
-    const metadata = lexicalMetadatas[docIndex] ?? {};
-    const document = lexicalDocuments[docIndex] ?? "";
-    if (!document.trim()) {
-      return;
-    }
-
     const existing = byId.get(item.id);
-    const baseChunk =
-      existing ??
-      ({
-        id: item.id,
-        repoId,
-        filePath: asString(metadata.filePath),
-        fileName: asString(metadata.fileName),
-        language: asString(metadata.language),
-        folder: asString(metadata.folder, "/"),
-        startLine: asNumber(metadata.startLine, 0),
-        endLine: asNumber(metadata.endLine, 0),
-        content: document,
-        distance: 999,
-      } satisfies RetrievedChunk);
+    if (!existing) {
+      return;
+    }
 
     byId.set(item.id, {
-      ...baseChunk,
+      ...existing,
       lexicalRank: index + 1,
       bm25Score: item.score,
     });
