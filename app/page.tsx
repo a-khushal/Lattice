@@ -57,6 +57,31 @@ interface DashboardResponse {
   avgEstimatedCostUsd: number;
 }
 
+interface EvaluationCase {
+  question: string;
+  expectedAnswer?: string;
+  expectedAnswerRegex?: string;
+  expectedSourceFiles?: string[];
+}
+
+interface EvaluationResultCase {
+  question: string;
+  contextCount: number;
+  matchedAnswerExpectation: boolean;
+  matchedSourceExpectation: boolean;
+  groundednessScore: number;
+}
+
+interface EvaluationResponse {
+  repoId: string;
+  totalCases: number;
+  exactMatchAccuracy: number;
+  contextRelevance: number;
+  groundedness: number;
+  averageContextCount: number;
+  cases: EvaluationResultCase[];
+}
+
 export default function Home() {
   const [repoUrl, setRepoUrl] = useState("");
   const [repoId, setRepoId] = useState("");
@@ -72,6 +97,13 @@ export default function Home() {
   const [ingestResult, setIngestResult] = useState<IngestResponse | null>(null);
   const [queryResult, setQueryResult] = useState<QueryResponse | null>(null);
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+  const [evaluationInput, setEvaluationInput] = useState(
+    '[\n  {\n    "question": "Where is routing handled?"\n  }\n]',
+  );
+  const [evaluationReport, setEvaluationReport] =
+    useState<EvaluationResponse | null>(null);
+  const [evaluationLoading, setEvaluationLoading] = useState(false);
+  const [evaluationError, setEvaluationError] = useState<string | null>(null);
 
   const readyForQuery = useMemo(() => repoId.trim().length > 0, [repoId]);
 
@@ -192,6 +224,53 @@ export default function Home() {
       setError(message);
     } finally {
       setQueryLoading(false);
+    }
+  }
+
+  async function runEvaluation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setEvaluationError(null);
+    setEvaluationLoading(true);
+
+    try {
+      const parsed = JSON.parse(evaluationInput) as unknown;
+      if (!Array.isArray(parsed)) {
+        throw new Error("Evaluation input must be a JSON array of cases");
+      }
+
+      const cases = parsed.filter((item): item is EvaluationCase => {
+        return (
+          !!item &&
+          typeof item === "object" &&
+          typeof (item as Record<string, unknown>).question === "string"
+        );
+      });
+
+      if (cases.length === 0) {
+        throw new Error("At least one valid case with a question is required");
+      }
+
+      const response = await fetch("/api/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repoId, cases }),
+      });
+
+      const payload = (await response.json()) as EvaluationResponse & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to run evaluation");
+      }
+
+      setEvaluationReport(payload);
+    } catch (caught) {
+      const message =
+        caught instanceof Error ? caught.message : "Failed to run evaluation";
+      setEvaluationError(message);
+    } finally {
+      setEvaluationLoading(false);
     }
   }
 
@@ -398,6 +477,83 @@ export default function Home() {
                   Metrics track latency, retrieval relevance, token usage, and estimated
                   per-query cost for this repo.
                 </p>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-2xl bg-card/80 shadow-none">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-2">
+                  <Activity className="size-4 text-primary" />
+                  <Label>Evaluation</Label>
+                </div>
+                <CardDescription>
+                  Run known architecture/file-location checks against this repo.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <form onSubmit={runEvaluation} className="space-y-3">
+                  <Label htmlFor="evaluation-cases">Cases JSON</Label>
+                  <Textarea
+                    id="evaluation-cases"
+                    value={evaluationInput}
+                    onChange={(event) => setEvaluationInput(event.target.value)}
+                    rows={6}
+                    className="font-mono text-xs"
+                  />
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    className="w-full"
+                    disabled={evaluationLoading || !readyForQuery}
+                  >
+                    {evaluationLoading ? "Running evaluation..." : "Run Evaluation"}
+                  </Button>
+                </form>
+
+                {evaluationError ? (
+                  <p className="text-xs text-destructive">{evaluationError}</p>
+                ) : null}
+
+                {evaluationReport ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                      <p className="rounded-lg border border-border bg-background px-2 py-1.5">
+                        Cases: {evaluationReport.totalCases}
+                      </p>
+                      <p className="rounded-lg border border-border bg-background px-2 py-1.5">
+                        Exact match: {(evaluationReport.exactMatchAccuracy * 100).toFixed(1)}%
+                      </p>
+                      <p className="rounded-lg border border-border bg-background px-2 py-1.5">
+                        Context relevance: {(evaluationReport.contextRelevance * 100).toFixed(1)}%
+                      </p>
+                      <p className="rounded-lg border border-border bg-background px-2 py-1.5">
+                        Groundedness: {(evaluationReport.groundedness * 100).toFixed(1)}%
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      {evaluationReport.cases.slice(0, 5).map((item, index) => (
+                        <div
+                          key={`${item.question}-${index}`}
+                          className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs"
+                        >
+                          <p className="font-medium text-card-foreground">{item.question}</p>
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            <Badge variant={item.matchedAnswerExpectation ? "secondary" : "outline"}>
+                              answer {item.matchedAnswerExpectation ? "ok" : "miss"}
+                            </Badge>
+                            <Badge variant={item.matchedSourceExpectation ? "secondary" : "outline"}>
+                              sources {item.matchedSourceExpectation ? "ok" : "miss"}
+                            </Badge>
+                            <Badge variant="outline">
+                              grounded {(item.groundednessScore * 100).toFixed(0)}%
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           </CardContent>

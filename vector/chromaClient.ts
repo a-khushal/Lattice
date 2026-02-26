@@ -19,6 +19,7 @@ export async function getRepoChunksCollection(): Promise<Collection> {
   if (!collectionPromise) {
     collectionPromise = getClient().getOrCreateCollection({
       name: COLLECTION_NAME,
+      embeddingFunction: null,
       metadata: {
         description: "Lattice semantic chunks",
       },
