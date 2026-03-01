@@ -43,6 +43,7 @@ export interface QueryMetricEvent {
   totalLatencyMs: number;
   contextCount: number;
   relevanceScore: number;
+  retrievalAccuracyProxy: number;
   tokenUsage: number;
   estimatedCostUsd: number;
   timestamp: string;

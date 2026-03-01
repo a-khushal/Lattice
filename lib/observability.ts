@@ -14,6 +14,7 @@ export interface MetricsDashboard {
   avgQueryLatencyMs: number;
   avgContextCount: number;
   avgRelevanceScore: number;
+  avgRetrievalAccuracyProxy: number;
   avgTokenUsage: number;
   avgEstimatedCostUsd: number;
   recentQueries: QueryMetricEvent[];
@@ -85,6 +86,7 @@ export async function logQueryMetric(event: QueryMetricEvent): Promise<void> {
         completionLatencyMs: event.completionLatencyMs,
         contextCount: event.contextCount,
         relevanceScore: event.relevanceScore,
+        retrievalAccuracyProxy: event.retrievalAccuracyProxy,
         tokenUsage: event.tokenUsage,
         estimatedCostUsd: event.estimatedCostUsd,
         timestamp: event.timestamp,
@@ -142,6 +144,9 @@ export async function getMetricsDashboard(
     avgQueryLatencyMs: average(queryEvents.map((event) => event.totalLatencyMs)),
     avgContextCount: average(queryEvents.map((event) => event.contextCount)),
     avgRelevanceScore: average(queryEvents.map((event) => event.relevanceScore)),
+    avgRetrievalAccuracyProxy: average(
+      queryEvents.map((event) => event.retrievalAccuracyProxy ?? 0),
+    ),
     avgTokenUsage: average(queryEvents.map((event) => event.tokenUsage)),
     avgEstimatedCostUsd: average(
       queryEvents.map((event) => event.estimatedCostUsd),
@@ -175,10 +180,13 @@ export function estimateTokenUsage(input: {
 }
 
 export function computeRelevanceScore(distances: number[]): number {
-  if (distances.length === 0) {
+  const validDistances = distances.filter((distance) => distance < 999);
+  if (validDistances.length === 0) {
     return 0;
   }
 
-  const normalized = distances.map((distance) => 1 / (1 + Math.max(0, distance)));
+  const normalized = validDistances.map(
+    (distance) => 1 / (1 + Math.max(0, distance)),
+  );
   return average(normalized);
 }

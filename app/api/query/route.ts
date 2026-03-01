@@ -1,5 +1,10 @@
 import { generateAnswer } from "@/lib/generateAnswer";
-import { retrieveContext, buildContextWindow } from "@/lib/retrieveContext";
+import {
+  retrieveContext,
+  buildContextWindow,
+  computeRetrievalAccuracyProxy,
+  suggestContributionEntryPoints,
+} from "@/lib/retrieveContext";
 import {
   computeRelevanceScore,
   estimateQueryCostUsd,
@@ -54,6 +59,8 @@ export async function POST(request: Request): Promise<Response> {
     const relevanceScore = computeRelevanceScore(
       chunks.map((chunk) => chunk.distance),
     );
+    const retrievalAccuracyProxy = computeRetrievalAccuracyProxy(chunks);
+    const entryPoints = suggestContributionEntryPoints(chunks);
 
     await logQueryMetric({
       repoId,
@@ -64,6 +71,7 @@ export async function POST(request: Request): Promise<Response> {
       totalLatencyMs,
       contextCount: chunks.length,
       relevanceScore,
+      retrievalAccuracyProxy,
       tokenUsage: usage.totalTokens,
       estimatedCostUsd,
       timestamp: new Date().toISOString(),
@@ -79,9 +87,11 @@ export async function POST(request: Request): Promise<Response> {
         completionLatencyMs,
         totalLatencyMs,
         relevanceScore,
+        retrievalAccuracyProxy,
         tokenUsage: usage.totalTokens,
         estimatedCostUsd,
       },
+      entryPoints,
       sources: chunks.map((chunk) => ({
         filePath: chunk.filePath,
         startLine: chunk.startLine,

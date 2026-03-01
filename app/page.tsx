@@ -23,6 +23,7 @@ interface ApiMetricSnippet {
   completionLatencyMs?: number;
   totalLatencyMs?: number;
   relevanceScore?: number;
+  retrievalAccuracyProxy?: number;
   tokenUsage?: number;
   estimatedCostUsd?: number;
 }
@@ -40,6 +41,13 @@ interface QueryResponse {
   answer: string;
   contextCount: number;
   metrics?: ApiMetricSnippet;
+  entryPoints?: Array<{
+    filePath: string;
+    folder: string;
+    mentionCount: number;
+    avgHybridScore: number;
+    reason: string;
+  }>;
   sources: Array<{
     filePath: string;
     startLine: number;
@@ -53,6 +61,7 @@ interface DashboardResponse {
   avgQueryLatencyMs: number;
   avgContextCount: number;
   avgRelevanceScore: number;
+  avgRetrievalAccuracyProxy: number;
   avgTokenUsage: number;
   avgEstimatedCostUsd: number;
 }
@@ -77,6 +86,7 @@ interface EvaluationResponse {
   totalCases: number;
   exactMatchAccuracy: number;
   contextRelevance: number;
+  retrievalAccuracy: number;
   groundedness: number;
   averageContextCount: number;
   cases: EvaluationResultCase[];
@@ -395,6 +405,10 @@ export default function Home() {
                       <p className="mt-3 text-xs text-muted-foreground">
                         Latency {Math.round(queryResult.metrics.totalLatencyMs ?? 0)}ms,
                         relevance {(queryResult.metrics.relevanceScore ?? 0).toFixed(3)},
+                        retrieval proxy {(
+                          queryResult.metrics.retrievalAccuracyProxy ?? 0
+                        ).toFixed(3)}
+                        ,
                         tokens {Math.round(queryResult.metrics.tokenUsage ?? 0)}, cost $
                         {(queryResult.metrics.estimatedCostUsd ?? 0).toFixed(6)}
                       </p>
@@ -417,6 +431,28 @@ export default function Home() {
                         </li>
                       ))}
                     </ul>
+
+                    {queryResult.entryPoints && queryResult.entryPoints.length > 0 ? (
+                      <div className="mt-4 space-y-2">
+                        <Label className="text-xs">Contribution entry points</Label>
+                        <ul className="space-y-2 text-xs text-muted-foreground">
+                          {queryResult.entryPoints.map((entryPoint) => (
+                            <li
+                              key={entryPoint.filePath}
+                              className="rounded-lg border border-border bg-background px-2 py-1.5"
+                            >
+                              <p className="font-mono text-[11px] text-card-foreground">
+                                {entryPoint.filePath}
+                              </p>
+                              <p>
+                                {entryPoint.reason} ({entryPoint.mentionCount} match
+                                {entryPoint.mentionCount === 1 ? "" : "es"})
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
                   </CardContent>
                 </Card>
               </div>
@@ -461,6 +497,9 @@ export default function Home() {
                     </p>
                     <p className="rounded-lg border border-border bg-background px-2 py-1.5">
                       Avg relevance: {dashboard.avgRelevanceScore.toFixed(3)}
+                    </p>
+                    <p className="rounded-lg border border-border bg-background px-2 py-1.5">
+                      Retrieval proxy: {dashboard.avgRetrievalAccuracyProxy.toFixed(3)}
                     </p>
                     <p className="rounded-lg border border-border bg-background px-2 py-1.5">
                       Avg cost: ${dashboard.avgEstimatedCostUsd.toFixed(6)}
@@ -525,6 +564,9 @@ export default function Home() {
                       </p>
                       <p className="rounded-lg border border-border bg-background px-2 py-1.5">
                         Context relevance: {(evaluationReport.contextRelevance * 100).toFixed(1)}%
+                      </p>
+                      <p className="rounded-lg border border-border bg-background px-2 py-1.5">
+                        Retrieval accuracy: {(evaluationReport.retrievalAccuracy * 100).toFixed(1)}%
                       </p>
                       <p className="rounded-lg border border-border bg-background px-2 py-1.5">
                         Groundedness: {(evaluationReport.groundedness * 100).toFixed(1)}%

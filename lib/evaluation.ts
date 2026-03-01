@@ -17,6 +17,7 @@ export interface EvaluationReport {
   totalCases: number;
   exactMatchAccuracy: number;
   contextRelevance: number;
+  retrievalAccuracy: number;
   groundedness: number;
   averageContextCount: number;
   cases: EvaluationCaseResult[];
@@ -121,6 +122,9 @@ export async function runEvaluation(input: {
       results.map((result) => (result.matchedAnswerExpectation ? 1 : 0)),
     ),
     contextRelevance: average(
+      results.map((result) => (result.matchedSourceExpectation ? 1 : 0)),
+    ),
+    retrievalAccuracy: average(
       results.map((result) => (result.matchedSourceExpectation ? 1 : 0)),
     ),
     groundedness: average(results.map((result) => result.groundednessScore)),

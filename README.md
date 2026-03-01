@@ -33,9 +33,12 @@ Open `http://localhost:3000`.
   - body: `{ "repoUrl": "https://github.com/org/repo" }` or `{ "repoId": "..." }`
 - `POST /api/query`
   - body: `{ "question": "...", "repoId": "..." }`
+  - returns grounded answer, sources, retrieval metrics, and suggested contribution entry points
 - `GET /api/metrics?repoId=...`
+  - returns aggregate observability metrics including relevance and retrieval-accuracy proxy
 - `POST /api/evaluate`
   - body: `{ "repoId": "...", "cases": [{ "question": "..." }] }`
+  - returns evaluation report including exact match, context relevance, retrieval accuracy, and groundedness
 - `POST /api/webhooks/github`
   - expects `X-Hub-Signature-256` using `GITHUB_WEBHOOK_SECRET`
 
