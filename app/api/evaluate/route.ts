@@ -1,4 +1,5 @@
 import { runEvaluation } from "@/lib/evaluation";
+import { guardApiRequest } from "@/lib/requestGuards";
 import type { EvaluationCase } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -13,6 +14,14 @@ function isEvaluationCase(input: unknown): input is EvaluationCase {
 }
 
 export async function POST(request: Request): Promise<Response> {
+  const guardFailure = guardApiRequest(request, {
+    routeKey: "evaluate",
+    maxRequestsPerWindow: 12,
+  });
+  if (guardFailure) {
+    return guardFailure;
+  }
+
   try {
     const payload = (await request.json()) as {
       repoId?: unknown;

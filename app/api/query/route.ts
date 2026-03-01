@@ -1,4 +1,5 @@
 import { generateAnswer } from "@/lib/generateAnswer";
+import { cacheQueryResult, getCachedQuery } from "@/lib/queryCache";
 import {
   retrieveContext,
   buildContextWindow,
@@ -11,11 +12,20 @@ import {
   estimateTokenUsage,
   logQueryMetric,
 } from "@/lib/observability";
+import { guardApiRequest } from "@/lib/requestGuards";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request): Promise<Response> {
   const totalStart = Date.now();
+
+  const guardFailure = guardApiRequest(request, {
+    routeKey: "query",
+    maxRequestsPerWindow: 40,
+  });
+  if (guardFailure) {
+    return guardFailure;
+  }
 
   try {
     const payload = (await request.json()) as {
@@ -32,6 +42,45 @@ export async function POST(request: Request): Promise<Response> {
         { error: "question and repoId are required" },
         { status: 400 },
       );
+    }
+
+    const cached = getCachedQuery(repoId, question);
+    if (cached) {
+      const totalLatencyMs = Date.now() - totalStart;
+
+      await logQueryMetric({
+        repoId,
+        question,
+        answer: cached.answer,
+        retrievalLatencyMs: 0,
+        completionLatencyMs: 0,
+        totalLatencyMs,
+        contextCount: cached.contextCount,
+        relevanceScore: cached.relevanceScore,
+        retrievalAccuracyProxy: cached.retrievalAccuracyProxy,
+        tokenUsage: cached.tokenUsage,
+        estimatedCostUsd: cached.estimatedCostUsd,
+        timestamp: new Date().toISOString(),
+      }).catch(() => {
+        return undefined;
+      });
+
+      return Response.json({
+        answer: cached.answer,
+        contextCount: cached.contextCount,
+        metrics: {
+          retrievalLatencyMs: 0,
+          completionLatencyMs: 0,
+          totalLatencyMs,
+          relevanceScore: cached.relevanceScore,
+          retrievalAccuracyProxy: cached.retrievalAccuracyProxy,
+          tokenUsage: cached.tokenUsage,
+          estimatedCostUsd: cached.estimatedCostUsd,
+          cached: true,
+        },
+        entryPoints: cached.entryPoints,
+        sources: cached.sources,
+      });
     }
 
     const retrievalStart = Date.now();
@@ -77,6 +126,21 @@ export async function POST(request: Request): Promise<Response> {
       timestamp: new Date().toISOString(),
     }).catch(() => {
       return undefined;
+    });
+
+    cacheQueryResult(repoId, question, {
+      answer,
+      contextCount: chunks.length,
+      relevanceScore,
+      retrievalAccuracyProxy,
+      tokenUsage: usage.totalTokens,
+      estimatedCostUsd,
+      entryPoints,
+      sources: chunks.map((chunk) => ({
+        filePath: chunk.filePath,
+        startLine: chunk.startLine,
+        endLine: chunk.endLine,
+      })),
     });
 
     return Response.json({

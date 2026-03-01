@@ -1,0 +1,17 @@
+[
+  {
+    "question": "Where is repository ingestion handled?",
+    "expectedAnswerRegex": "ingest",
+    "expectedSourceFiles": ["app/api/ingest/route.ts", "lib/ingestRepo.ts"]
+  },
+  {
+    "question": "Where are answers generated for /api/query?",
+    "expectedAnswerRegex": "generateAnswer|lib/generateAnswer.ts",
+    "expectedSourceFiles": ["lib/generateAnswer.ts"]
+  },
+  {
+    "question": "Where is vector storage client configuration located?",
+    "expectedAnswerRegex": "chroma|vector",
+    "expectedSourceFiles": ["vector/chromaClient.ts"]
+  }
+]

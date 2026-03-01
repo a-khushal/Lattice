@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
 :root {
+  --font-display: "Avenir Next", "Segoe UI", sans-serif;
+  --font-code: "Fira Code", "JetBrains Mono", "SFMono-Regular", monospace;
   --background: #f8f5ef;
   --foreground: #152036;
   --card: rgba(255, 255, 255, 0.7);

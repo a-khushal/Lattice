@@ -24,6 +24,7 @@ interface ApiMetricSnippet {
   totalLatencyMs?: number;
   relevanceScore?: number;
   retrievalAccuracyProxy?: number;
+  cached?: boolean;
   tokenUsage?: number;
   estimatedCostUsd?: number;
 }
@@ -403,6 +404,7 @@ export default function Home() {
                     </p>
                     {queryResult.metrics ? (
                       <p className="mt-3 text-xs text-muted-foreground">
+                        {queryResult.metrics.cached ? "Cached response, " : ""}
                         Latency {Math.round(queryResult.metrics.totalLatencyMs ?? 0)}ms,
                         relevance {(queryResult.metrics.relevanceScore ?? 0).toFixed(3)},
                         retrieval proxy {(

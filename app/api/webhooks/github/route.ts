@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { buildRepoId } from "@/lib/repoId";
 import { ingestRepository, reingestRepositoryByRepoId } from "@/lib/ingestRepo";
 import { logIngestMetric } from "@/lib/observability";
+import { invalidateRepoQueryCache } from "@/lib/queryCache";
 import { getRepoRegistrationById } from "@/lib/repoRegistry";
 
 export const runtime = "nodejs";
@@ -97,6 +98,8 @@ export async function POST(request: Request): Promise<Response> {
     const result = registration
       ? await reingestRepositoryByRepoId(repoId)
       : await ingestRepository(repoUrl, { defaultBranch });
+
+    invalidateRepoQueryCache(result.repoId);
 
     const latencyMs = Date.now() - startedAt;
 

@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { buildContextWindow } from "@/lib/retrieveContext";
+import { withRetry } from "@/lib/resilience";
 import type { RetrievedChunk } from "@/lib/types";
 
 const SYSTEM_PROMPT = [
@@ -30,26 +31,28 @@ export async function generateAnswer(
   const model = process.env.OPENAI_COMPLETION_MODEL ?? "gpt-4o-mini";
   const openai = getOpenAIClient();
 
-  const completion = await openai.chat.completions.create({
-    model,
-    temperature: 0.1,
-    messages: [
-      {
-        role: "system",
-        content: SYSTEM_PROMPT,
-      },
-      {
-        role: "user",
-        content: [
-          `Question:\n${question}`,
-          "",
-          "Repository Context:",
-          context,
-          "",
-          "Return a concise grounded answer and mention relevant file paths.",
-        ].join("\n"),
-      },
-    ],
+  const completion = await withRetry(() => {
+    return openai.chat.completions.create({
+      model,
+      temperature: 0.1,
+      messages: [
+        {
+          role: "system",
+          content: SYSTEM_PROMPT,
+        },
+        {
+          role: "user",
+          content: [
+            `Question:\n${question}`,
+            "",
+            "Repository Context:",
+            context,
+            "",
+            "Return a concise grounded answer and mention relevant file paths.",
+          ].join("\n"),
+        },
+      ],
+    });
   });
 
   const answer = completion.choices[0]?.message?.content?.trim();
